@@ -1,0 +1,159 @@
+Panels:
+  - Class: rviz/Displays
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /Global Options1
+        - /Fusion LiDAR Points1
+        - /Final Track State1
+        - /Velocity + Speed1
+      Splitter Ratio: 0.55
+    Tree Height: 720
+  - Class: rviz/Selection
+    Name: Selection
+  - Class: rviz/Views
+    Name: Views
+    Splitter Ratio: 0.5
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Alpha: 0.35
+      Cell Size: 1
+      Class: rviz/Grid
+      Color: 120; 120; 120
+      Enabled: true
+      Line Style:
+        Line Width: 0.03
+        Value: Lines
+      Name: Ground Grid
+      Normal Cell Count: 0
+      Offset: {X: 0, Y: 0, Z: 0}
+      Plane: XY
+      Plane Cell Count: 80
+      Reference Frame: <Fixed Frame>
+      Value: true
+    - Alpha: 0.20
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud
+      Color: 210; 210; 210
+      Color Transformer: FlatColor
+      Decay Time: 0.2
+      Enabled: true
+      Name: Filtered LiDAR Context
+      Position Transformer: XYZ
+      Queue Size: 5
+      Selectable: true
+      Size (Pixels): 2
+      Size (m): 0.04
+      Style: Points
+      Topic: /no_ground_display
+      Unreliable: false
+      Use Fixed Frame: true
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /rigid_mask/fusion_points
+      Name: Fusion LiDAR Points
+      Namespaces:
+        rigid_mask_fusion_points: true
+      Queue Size: 10
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /rigid_mask/track_status
+      Name: Final Track State
+      Namespaces:
+        track_state_body: true
+        track_state_text: true
+      Queue Size: 10
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /dynamic_velocity_marker
+      Name: Velocity + Speed
+      Namespaces:
+        dynamic_speed: true
+        dynamic_velocity: true
+      Queue Size: 10
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /centroid_marker
+      Name: Candidate Centers
+      Namespaces:
+        overlap_centroid: true
+      Queue Size: 10
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /roi_marker
+      Name: LiDAR ROI
+      Namespaces:
+        roi: true
+      Queue Size: 10
+      Value: true
+    - Class: rviz/Image
+      Enabled: false
+      Image Topic: /rigid_mask/camera_1/fusion_overlay
+      Max Value: 255
+      Median window: 5
+      Min Value: 0
+      Name: Camera 1 Fusion Overlay (optional)
+      Normalize Range: false
+      Queue Size: 2
+      Transport Hint: raw
+      Unreliable: false
+      Value: false
+  Enabled: true
+  Global Options:
+    Background Color: 22; 22; 22
+    Default Light: true
+    Fixed Frame: velodyne
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz/Interact
+      Hide Inactive Objects: true
+    - Class: rviz/MoveCamera
+    - Class: rviz/Select
+    - Class: rviz/FocusCamera
+    - Class: rviz/Measure
+  Value: true
+  Views:
+    Current:
+      Class: rviz/Orbit
+      Distance: 32
+      Enable Stereo Rendering:
+        Stereo Eye Separation: 0.06
+        Stereo Focal Distance: 1
+        Swap Stereo Eyes: false
+        Value: false
+      Focal Point: {X: 12, Y: 0, Z: 0}
+      Focal Shape Fixed Size: true
+      Focal Shape Size: 0.05
+      Invert Z Axis: false
+      Name: Fusion View
+      Near Clip Distance: 0.01
+      Pitch: 0.75
+      Target Frame: <Fixed Frame>
+      Yaw: 3.14159
+      Value: Orbit (rviz)
+Window Geometry:
+  Displays:
+    collapsed: false
+  Height: 900
+  Hide Left Dock: false
+  Hide Right Dock: false
+  QMainWindow State: 000000ff00000000fd0000000400000000000001f00000031efc0200000008fb000000100044006900730070006c006100790073010000003d0000031e000000c900fffffffb0000001200530065006c0065006300740069006f006e0000000000ffffffff0000005f00fffffffb0000000a00560069006500770073010000036100000124000000a000ffffff00000003000007800000005afc0100000001fb0000000800540069006d00650000000000ffffffff0000000000000000000005900000031e00000004000000040000000800000008fc00000000
+  Selection:
+    collapsed: false
+  Time:
+    collapsed: false
+  Views:
+    collapsed: false
+  Width: 1440
+  X: 80
+  Y: 45

@@ -1,0 +1,68 @@
+# Front camera only: one shared model no longer rotates across three streams.
+camera_ids: [1]
+input_topic_pattern: "/camera/{camera_id}/image_raw/compressed"
+output_topic_pattern: "/rigid_mask/camera_{camera_id}/dynamic_mask"
+debug_topic_pattern: "/rigid_mask/camera_{camera_id}/debug/compressed"
+lidar_support_topic_pattern: "/rigid_mask/camera_{camera_id}/lidar_support"
+
+# dh_lidar projects only 20 m, above-road LiDAR returns. RigidMask output is
+# UNKNOWN (127) everywhere else; the dense network still sees the full frame.
+use_lidar_support: true
+# dh_lidar now projects support at the exact camera reference timestamp.
+lidar_support_max_delta: 0.001
+lidar_support_dilation: 7
+
+# One model is shared sequentially by all cameras to limit GPU memory usage.
+device: "cuda:0"
+publish_debug: false
+publish_diagnostics: true
+queue_size: 1
+frame_skip: 0
+# MORAI publishes at about 20 Hz but can repeat rendered frames. A 0.1 s pair
+# matches the baseline commonly used by driving optical-flow models.
+pair_target_delta: 0.10
+pair_min_delta: 0.075
+pair_max_delta: 0.20
+test_resolution: 0.5
+dynamic_threshold: 0.5
+probability_margin: 0.10
+min_dynamic_area: 80
+mask_close_kernel: 5
+# Missing frame pairs and inference failures publish UNKNOWN (127). Treating
+# those cases as all-dynamic caused stationary LiDAR objects to flash red.
+fail_closed_dynamic: false
+
+# Essential-matrix pose is degenerate when the camera is stopped. Detect that
+# state from background feature flow and use compensated local image motion.
+stationary_camera_mode: true
+motion_analysis_scale: 0.5
+motion_reference_dt: 0.05
+stationary_enter_flow_px: 0.12
+stationary_exit_flow_px: 0.35
+stationary_difference_threshold: 8
+stationary_min_tracks: 30
+stationary_motion_dilation: 5
+stationary_min_dynamic_area: 250
+# No pixelwise hold across unregistered images. Track-level camera evidence
+# is retained by dh_lidar using reference timestamps instead.
+
+# /current_pose is used only to prevent the stationary-camera fallback from
+# running while the vehicle is creeping. It is not object-motion evidence.
+pose_topic: "/current_pose"
+pose_max_delta: 0.30
+ego_stationary_speed_mps: 0.15
+ego_moving_speed_mps: 0.75
+stationary_enter_seconds: 0.30
+stationary_exit_seconds: 0.25
+
+# Files stay inside this ROS package; no torch.hub or user cache is used.
+rigidmask_weights: "$(find rigid_mask_ros)/weights/rigidmask-sf/weights.pth"
+midas_weights: "$(find rigid_mask_ros)/weights/midas/midas_v21_384.pt"
+
+# Intrinsics are read from the same calibration used by my_lidar_pipeline.
+calibration_file: "$(find macaron_8)/src/vision/my_lidar_pipeline/my_lidar_pipeline/config/calibration/calibration_result.yaml"
+
+# OpenCV RANSAC replaces the old compiled NG-RANSAC extension.
+pose_estimator: "opencv"
+# Normalized-camera threshold corresponding to roughly one image pixel.
+ransac_threshold: 0.0015

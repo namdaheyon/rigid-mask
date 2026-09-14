@@ -1,0 +1,13 @@
+<launch>
+  <arg name="python" default="/home/macaronfrom8/anaconda3/envs/torch/bin/python"/>
+  <arg name="config" default="$(find rigid_mask_ros)/config/rigid_mask.yaml"/>
+  <arg name="front_image_topic" default=""/>
+
+  <!-- launch-prefix runs the catkin relay with the existing torch interpreter. -->
+  <node pkg="rigid_mask_ros" type="rigid_mask_node" name="rigid_mask"
+        output="screen" launch-prefix="$(arg python)">
+    <rosparam command="load" file="$(arg config)" subst_value="true"/>
+    <param if="$(eval arg('front_image_topic') != '')" name="input_topic_pattern"
+           value="$(arg front_image_topic)"/>
+  </node>
+</launch>

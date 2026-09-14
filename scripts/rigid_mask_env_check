@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+"""Read-only dependency and model-file check for rigid_mask_ros."""
+
+import os
+import sys
+
+
+def main():
+    import cv2
+    import numpy
+    import rospkg
+    import torch
+    import torchvision
+    from torchvision.ops import deform_conv2d
+
+    del deform_conv2d
+    print("python={}".format(sys.executable))
+    print("torch={} torchvision={} opencv={} numpy={}".format(
+        torch.__version__, torchvision.__version__, cv2.__version__, numpy.__version__))
+    print("cuda_available={}".format(torch.cuda.is_available()))
+    if torch.cuda.is_available():
+        print("cuda_device={}".format(torch.cuda.get_device_name(0)))
+
+    package_root = rospkg.RosPack().get_path("rigid_mask_ros")
+    files = {
+        "rigidmask_weights": os.path.join(
+            package_root, "weights", "rigidmask-sf", "weights.pth"),
+        "midas_weights": os.path.join(
+            package_root, "weights", "midas", "midas_v21_384.pt"),
+    }
+    for name, value in files.items():
+        print("{}={} exists={}".format(name, value, os.path.isfile(value)))
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,56 @@
+<launch>
+  <arg name="python" default="/home/macaronfrom8/anaconda3/envs/torch/bin/python"/>
+  <arg name="rigid_mask_config" default="$(find rigid_mask_ros)/config/rigid_mask.yaml"/>
+  <arg name="calibration" default="$(find macaron_8)/src/vision/my_lidar_pipeline/my_lidar_pipeline/config/calibration/calibration_result.yaml"/>
+  <arg name="cloud_topic" default="/velodyne_points"/>
+  <arg name="pose_topic" default="/current_pose"/>
+  <arg name="front_image_topic" default="/camera/1/image_raw/compressed"/>
+  <arg name="reference_image_topic" default="/rigid_mask/camera_1/reference_image/compressed"/>
+  <arg name="front_mask_topic" default="/rigid_mask/camera_1/dynamic_mask"/>
+  <arg name="start_rigid_mask" default="true"/>
+  <arg name="start_lidar_fusion" default="true"/>
+  <arg name="start_rviz" default="true"/>
+
+  <!-- One calibration source is shared by image inference and LiDAR projection. -->
+  <rosparam command="load" file="$(arg calibration)"
+            ns="/rigid_mask/calibration" subst_value="true"/>
+
+  <include if="$(arg start_rigid_mask)"
+           file="$(find rigid_mask_ros)/launch/rigid_mask.launch">
+    <arg name="python" value="$(arg python)"/>
+    <arg name="config" value="$(arg rigid_mask_config)"/>
+    <arg name="front_image_topic" value="$(arg front_image_topic)"/>
+  </include>
+
+  <node if="$(arg start_lidar_fusion)" pkg="macaron_8" type="dh_lidar"
+        name="dh_lidar" output="screen">
+    <param name="cloud_topic" value="$(arg cloud_topic)"/>
+    <param name="pose_topic" value="$(arg pose_topic)"/>
+    <param name="camera_1_image_topic" value="$(arg reference_image_topic)"/>
+    <param name="camera_1_mask_topic" value="$(arg front_mask_topic)"/>
+    <param name="calibration_namespace" value="/rigid_mask/calibration"/>
+    <rosparam param="camera_ids">[1]</rosparam>
+    <param name="roi_distance" value="20.0"/>
+    <!-- LiDAR never waits for masks; late results update timestamped track IDs. -->
+    <param name="camera_image_max_delta" value="0.05"/>
+    <!-- Compensate ego motion across at most 50 ms; object motion across
+         that interval is not estimated by the camera/LiDAR projection. -->
+    <param name="mask_max_delta" value="0.05"/>
+    <param name="mask_cache_seconds" value="5.0"/>
+    <param name="mask_min_projected_points" value="3"/>
+    <param name="mask_min_valid_fraction" value="0.50"/>
+    <param name="mask_dynamic_ratio" value="0.25"/>
+    <param name="mask_static_ratio" value="0.05"/>
+    <param name="mask_sample_radius" value="1"/>
+    <param name="dynamic_confirm_count" value="2"/>
+    <param name="static_confirm_count" value="2"/>
+    <!-- Confirmation counts distinct camera reference stamps, including the
+         first observation. Missing masks retain state for a bounded time. -->
+    <param name="mask_state_max_age" value="0.75"/>
+  </node>
+
+  <node if="$(arg start_rviz)" pkg="rviz" type="rviz"
+        name="rigid_mask_fusion_rviz" output="screen"
+        args="-d $(find rigid_mask_ros)/config/fusion.rviz"/>
+
+</launch>

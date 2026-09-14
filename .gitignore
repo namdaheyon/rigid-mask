@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/
+
+# ROS / logs
+*.log
+.ros/
+
+# Debug / captures
+*.npz
+*.npy
+
+# Model weights
+*.pth
+*.pt
+*.ckpt
+
+# Temporary
+*.tmp
+*.swp
+.DS_Storeweights/**/*.pth
+__pycache__/
+*.pyc
