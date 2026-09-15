@@ -55,13 +55,26 @@ def vehicle_pose(metadata, calibration, lidar_origin):
     return dict(rotation=rot, translation=trans, essential=essential)
 
 
-def statistics(probability, selection):
+def runtime_thresholds(metadata):
+    saved = metadata.get('foreground_thresholds')
+    if isinstance(saved, dict):
+        dynamic = saved.get('dynamic_probability_threshold')
+        static = saved.get('static_probability_threshold')
+        if (isinstance(dynamic, (int, float)) and np.isfinite(dynamic)
+                and isinstance(static, (int, float)) and np.isfinite(static)):
+            return dict(dynamic=float(dynamic), static=float(static),
+                        source='capture_metadata.foreground_thresholds')
+    return dict(dynamic=.6, static=.4, source='fallback_legacy_0.6_0.4',
+                warning='Actual runtime thresholds unavailable in this legacy capture')
+
+
+def statistics(probability, selection, thresholds):
     values = probability[selection]
     if not values.size:
         return dict(pixels=0)
     return dict(pixels=int(values.size), mean_probability=float(values.mean()),
-                dynamic_at_0_6=float(np.mean(values >= .6)),
-                static_at_0_4=float(np.mean(values <= .4)))
+                dynamic_fraction=float(np.mean(values >= thresholds['dynamic'])),
+                static_fraction=float(np.mean(values <= thresholds['static'])))
 
 
 def main():
@@ -85,6 +98,7 @@ def main():
         with np.load(path, allow_pickle=False) as archive:
             data = {key: archive[key] for key in archive.files}
         metadata = json.loads(str(data['metadata_json']))
+        thresholds = runtime_thresholds(metadata)
         try:
             alternative = vehicle_pose(metadata, yaml.safe_load(str(data['calibration_yaml'])),
                                        args.lidar_origin_vehicle)
@@ -105,10 +119,13 @@ def main():
         report = dict(capture=str(path.resolve()), metadata=metadata,
                       lidar_origin_vehicle=args.lidar_origin_vehicle,
                       device=args.device, resolution=args.resolution,
+                      runtime_thresholds=thresholds,
                       warning='Planar pose sensitivity test, not ground-truth accuracy; no mask morphology applied',
                       saved_probability_mae=float(np.mean(np.abs(results['saved_visual_pose']-data['probability']))),
-                      all_valid={k: statistics(v, valid) for k, v in results.items()},
-                      originally_dynamic={k: statistics(v, data['gated_mask']==255) for k,v in results.items()})
+                      all_valid={k: statistics(v, valid, thresholds) for k, v in results.items()},
+                      originally_dynamic={
+                          k: statistics(v, data['gated_mask'] == 255, thresholds)
+                          for k, v in results.items()})
         np.savez(output/f'{index:02d}_probabilities.npz', **results,
                  valid_mask=valid, previous_bgr=data['previous_bgr'])
         with open(output/f'{index:02d}_summary.json', 'x', encoding='utf-8') as stream:

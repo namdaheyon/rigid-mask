@@ -12,6 +12,25 @@ from rigid_mask_ros import geometry as kornia
 from .submodule import pspnet, bfmodule, bfmodule_feat, conv, compute_geo_costs, get_skew_mat, get_intrinsics, F_ngransac
 from .conv4d import sepConv4d, butterfly4D
 
+
+FOREGROUND_CONTRIBUTION_CHANNEL_NAMES = [
+    'symmetric_transfer', 'epipolar', 'angular_2d', 'distance_3d',
+    'angular_3d', 'depth_contrast',
+]
+
+FGNET_INPUT_CHANNEL_GROUPS = [
+    ('symmetric_transfer_embedding', 16),
+    ('epipolar_embedding', 16),
+    ('angular_2d_embedding', 16),
+    ('distance_3d_embedding', 16),
+    ('angular_3d_embedding', 16),
+    ('flow_oor_logits_embedding', 16),
+    ('depth_change_uncertainty_embedding', 16),
+    ('depth_contrast_embedding', 16),
+    ('normalized_frame0_3d_embedding', 16),
+    ('normalized_frame1_3d_embedding', 16),
+]
+
 class flow_reg(nn.Module):
     """
     Soft winner-take-all that selects the most likely diplacement.
@@ -143,7 +162,7 @@ class VCN(nn.Module):
     def diagnostic_tensor(self, name, value):
         """Bounded, sampled diagnostics; never modifies inference tensors."""
         if getattr(self, 'capture_spatial_diagnostics', False):
-            self.spatial_diagnostics[name] = value.detach().float().cpu().numpy().copy()
+            self.spatial_diagnostics[name] = value.detach().cpu().numpy().copy()
         if not getattr(self, 'collect_diagnostics', False):
             return
         flat = value.detach().reshape(-1)
@@ -362,6 +381,18 @@ class VCN(nn.Module):
         self.fgnetv9 = conv(3,   16, kernel_size=3, stride=1, padding=1,dilation=1) # 
         self.fgnetv10 = conv(3,   16, kernel_size=3, stride=1, padding=1,dilation=1) # 
         self.fgnet = bfmodule_feat(208-3*16,7)
+        self.foreground_contribution_channel_names = list(
+            FOREGROUND_CONTRIBUTION_CHANNEL_NAMES)
+        self.fgnet_input_channel_names = [
+            '{}.feature_{:02d}'.format(group, index)
+            for group, count in FGNET_INPUT_CHANNEL_GROUPS
+            for index in range(count)
+        ]
+        self.fgnet_input_channel_groups = [
+            {'name': group, 'start': sum(size for _, size in FGNET_INPUT_CHANNEL_GROUPS[:position]),
+             'stop': sum(size for _, size in FGNET_INPUT_CHANNEL_GROUPS[:position + 1])}
+            for position, (group, _) in enumerate(FGNET_INPUT_CHANNEL_GROUPS)
+        ]
 
         # Local architecture only. Weights are loaded explicitly by the ROS
         # wrapper; torch.hub is intentionally never called.
@@ -642,6 +673,12 @@ class VCN(nn.Module):
             self.diagnostic_tensor('vcn_flow_x_network_px', flow[:, 0])
             self.diagnostic_tensor('vcn_flow_y_network_px', flow[:, 1])
             self.diagnostic_tensor('depth_ratio_Z0_over_Z1', tau)
+            if getattr(self, 'capture_spatial_diagnostics', False):
+                # dchange2 is trained as log(Z1/Z0). Keep both conventions so
+                # offline audits can verify the reciprocal conversion numerically.
+                self.diagnostic_tensor(
+                    'optical_expansion_tau_Z1_over_Z0',
+                    dchange2[:, 0].exp().detach())
             self.diagnostic_tensor('flow_oor_logits', oor2)
             self.diagnostic_tensor('depth_change_uncertainty', dc_unc)
 
@@ -806,6 +843,8 @@ class VCN(nn.Module):
                 # Exact additive terms before interpolation, in the order of
                 # fg_hps above. Preserve geometry for offline pose A/B replay.
                 for name, value in dict(
+                        fgnet_input_tensor=costs,
+                        fgnet_raw_output=x,
                         foreground_contributions=fg_va * fg_hps,
                         foreground_weights=fg_va, foreground_inputs=fg_hps,
                         foreground_residual=fg_res, geometry_hp0=hp0,

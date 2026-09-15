@@ -701,15 +701,72 @@ class RigidMaskNode:
                           probability=probability, gated_mask=mask,
                           calibration_yaml=np.array(self.diagnostic_calibration_yaml),
                           camera_matrix=self.camera_matrices[camera_id])
-            metadata = dict(schema_version=1, camera_id=camera_id,
+            contribution_names = list(
+                self.model.model.foreground_contribution_channel_names)
+            fgnet_input_names = list(self.model.model.fgnet_input_channel_names)
+            metadata = dict(schema_version=2, camera_id=camera_id,
                             previous_stamp=previous_message.header.stamp.to_sec(),
                             current_stamp=current_message.header.stamp.to_sec(),
                             ego_pair=self._diagnostic_ego_pair(previous_message, current_message),
                             pose=getattr(F_ngransac, 'last_diagnostics', {}),
-                            contribution_order=['symmetric_transfer', 'epipolar',
-                                                'angular_2d', 'distance_3d',
-                                                'angular_3d', 'depth_contrast'],
+                            contribution_order=contribution_names,
+                            foreground_contribution_channel_names=contribution_names,
+                            fgnet_input_channel_names=fgnet_input_names,
+                            fgnet_input_channel_groups=
+                                self.model.model.fgnet_input_channel_groups,
+                            foreground_thresholds=dict(
+                                base_threshold=self.threshold,
+                                probability_margin=self.probability_margin,
+                                dynamic_probability_threshold=
+                                    self.threshold + self.probability_margin,
+                                static_probability_threshold=
+                                    self.threshold - self.probability_margin,
+                                source='RigidMaskNode._postprocess'),
+                            foreground_replay=dict(
+                                final_logit_key='foreground_logits',
+                                final_probability_key='probability',
+                                native_formula='sum(foreground_contributions, channel) + foreground_residual',
+                                network_resize='torch.nn.functional.interpolate(mode=bilinear, align_corners=False)',
+                                activation='sigmoid',
+                                full_frame_resize='cv2.resize(interpolation=INTER_LINEAR)'),
+                            tau_conventions=dict(
+                                raw_key='optical_expansion_tau_Z1_over_Z0',
+                                raw_convention='Z1/Z0',
+                                converted_key='depth_ratio_Z0_over_Z1',
+                                converted_convention='Z0/Z1'),
                             note='Raw full frames and spatial maps; alternative pose is offline only')
+            metadata['tensor_metadata'] = {
+                name: {'shape': list(np.asarray(value).shape),
+                       'dtype': str(np.asarray(value).dtype)}
+                for name, value in arrays.items()
+                if name in ('fgnet_input_tensor', 'fgnet_raw_output',
+                            'foreground_inputs', 'foreground_contributions',
+                            'foreground_residual',
+                            'foreground_logits', 'probability',
+                            'optical_expansion_tau_Z1_over_Z0',
+                            'depth_ratio_Z0_over_Z1')
+            }
+            metadata['fgnet_input_capture'] = dict(
+                key='fgnet_input_tensor', layout='BCHW', batch_axis=0,
+                channel_axis=1, spatial_axes=[2, 3],
+                channel_names=fgnet_input_names,
+                channel_groups=self.model.model.fgnet_input_channel_groups,
+                tensor=metadata['tensor_metadata'].get('fgnet_input_tensor'),
+                capture_semantics='detached CPU copy; inference tensor was not modified')
+            metadata['fgnet_reinference_capture'] = dict(
+                module='VCN.fgnet (bfmodule_feat(160, 7))',
+                input_key='fgnet_input_tensor', raw_output_key='fgnet_raw_output',
+                foreground_hypotheses_key='foreground_inputs',
+                output_semantics=dict(
+                    weight_channels='raw_output[:, :6] / 20',
+                    residual_channel='raw_output[:, 6:7] / 200',
+                    final_native_logit='sum(weights * foreground_hypotheses, channel) + residual'))
+            metadata['foreground_contribution_capture'] = dict(
+                key='foreground_contributions', layout='BCHW', batch_axis=0,
+                channel_axis=1, spatial_axes=[2, 3],
+                channel_names=contribution_names,
+                tensor=metadata['tensor_metadata'].get(
+                    'foreground_contributions'))
             metadata['region_diagnostics'] = self._region_diagnostics(arrays, mask)
             metadata['capture_interval_seconds'] = self.capture_interval
             rospy.loginfo('RIGID_REGION_DIAG camera=%d ref=%.9f data=%s', camera_id,
